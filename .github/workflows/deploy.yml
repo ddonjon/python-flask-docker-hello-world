@@ -47,4 +47,5 @@ jobs:
           EOF
 
           sudo ln -sf /etc/nginx/sites-available/flask /etc/nginx/sites-enabled/
+          sudo rm /etc/nginx/sites-enabled/default
           sudo nginx -t && sudo systemctl restart nginx
