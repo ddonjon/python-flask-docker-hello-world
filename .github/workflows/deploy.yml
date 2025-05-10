@@ -25,27 +25,31 @@ jobs:
           sudo systemctl enable docker
           sudo systemctl start docker
 
+          # Clone or update repo
           if [ ! -d "python-flask-docker-hello-world" ]; then
             git clone https://github.com/ddonjon/python-flask-docker-hello-world.git
           else
             cd python-flask-docker-hello-world && git pull && cd ..
           fi
 
+          # Build and run container
           cd python-flask-docker-hello-world
           sudo docker build -t flask-app .
+          sudo docker rm -f flask-app || true
           sudo docker run -d -p 5000:5000 --name flask-app flask-app
 
+          # Configure Nginx
+          sudo rm -f /etc/nginx/sites-enabled/default
           sudo tee /etc/nginx/sites-available/flask <<EOF
           server {
               listen 80;
               location / {
                   proxy_pass http://localhost:5000;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
               }
           }
           EOF
 
-          sudo ln -sf /etc/nginx/sites-available/flask /etc/nginx/sites-enabled/
-          sudo rm /etc/nginx/sites-enabled/default
+          sudo ln -sf /etc/nginx/sites-available/flask /etc/nginx/sites-enabled/flask
           sudo nginx -t && sudo systemctl restart nginx
