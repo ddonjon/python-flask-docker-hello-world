@@ -1,0 +1,50 @@
+name: Deploy Flask App to EC2
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Fetch Code
+      uses: actions/checkout@v3
+
+    - name: Deploy to EC2 via SSH
+      uses: appleboy/ssh-action@v0.1.10
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          sudo apt update
+          sudo apt install -y docker.io git nginx
+          sudo systemctl enable docker
+          sudo systemctl start docker
+
+          if [ ! -d "python-flask-docker-hello-world" ]; then
+            git clone https://github.com/ddonjon/python-flask-docker-hello-world.git
+          else
+            cd python-flask-docker-hello-world && git pull && cd ..
+          fi
+
+          cd python-flask-docker-hello-world
+          sudo docker build -t flask-app .
+          sudo docker run -d -p 5000:5000 --name flask-app flask-app
+
+          sudo tee /etc/nginx/sites-available/flask <<EOF
+          server {
+              listen 80;
+              location / {
+                  proxy_pass http://localhost:5000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+          }
+          EOF
+
+          sudo ln -sf /etc/nginx/sites-available/flask /etc/nginx/sites-enabled/
+          sudo nginx -t && sudo systemctl restart nginx
